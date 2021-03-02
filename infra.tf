@@ -13,7 +13,9 @@ provider "aws" {
   region  = "ap-south-1"
 }	
 
+#PART 1 --- Setting up Networking---
 
+#Creation of VPC
 resource "aws_vpc" "my_vpc" {
   cidr_block       = "10.0.0.0/16"
   enable_dns_hostnames = true
@@ -34,7 +36,7 @@ resource "aws_subnet" "public_ap_south_1a" {
     Name = "Public Subnet ap-south-1a"
   }
 }
-#Creating a public2 Subnet
+#Creating a Public Subnet 2
 resource "aws_subnet" "public2_ap_south_1b" {
   vpc_id     = aws_vpc.my_vpc.id
   cidr_block = "10.0.1.0/24"
@@ -64,17 +66,21 @@ resource "aws_subnet" "private2_ap_south_1b" {
     Name = "private2 Subnet ap-south-1b"
   }
 }
-#creating an IGW
+
+#Creating an IGW
 resource "aws_internet_gateway" "my_vpc_igw" {
   vpc_id = aws_vpc.my_vpc.id
   tags = {
     Name = "My VPC - Internet Gateway"
   }
 }
+
+
 #NAT EIP
 resource "aws_eip" "nat_1" {
   vpc                       = true
 }
+
 #NAT Gateway
 resource "aws_nat_gateway" "gw_1" {
   allocation_id = aws_eip.nat_1.id
@@ -83,6 +89,7 @@ resource "aws_nat_gateway" "gw_1" {
     Name = "gw NAT 1"
   }
 }
+
 #Creating a Public RT
 resource "aws_route_table" "my_vpc_public" {
     vpc_id = aws_vpc.my_vpc.id
@@ -94,6 +101,7 @@ resource "aws_route_table" "my_vpc_public" {
         Name = "Public Subnets Route Table for My VPC"
     }
 }
+
 #Creating a private RT
 resource "aws_route_table" "my_vpc_private" {
     vpc_id = aws_vpc.my_vpc.id
@@ -105,6 +113,8 @@ resource "aws_route_table" "my_vpc_private" {
         Name = "Private Subnets Route Table for My VPC"
     }
 }
+
+
 #Route table associations -- Public
 resource "aws_route_table_association" "my_vpc_ap_south_1a_public" {
     subnet_id = aws_subnet.public_ap_south_1a.id
@@ -114,6 +124,8 @@ resource "aws_route_table_association" "my_vpc_ap_south_1b_public" {
     subnet_id = aws_subnet.public2_ap_south_1b.id
     route_table_id = aws_route_table.my_vpc_public.id
 }
+
+
 #Route table associations-- Private
 resource "aws_route_table_association" "my_vpc_ap_south_1a_private" {
     subnet_id = aws_subnet.private1_ap_south_1a.id
@@ -123,6 +135,8 @@ resource "aws_route_table_association" "my_vpc_ap_south_1b_private" {
     subnet_id = aws_subnet.private2_ap_south_1b.id
     route_table_id = aws_route_table.my_vpc_private.id
 }
+
+#PART 2 --- Setting up Bastion and Load Balancer ---
 
 #Sec group for bastion
 resource "aws_security_group" "bastion-sg" {
@@ -134,7 +148,7 @@ resource "aws_security_group" "bastion-sg" {
     from_port   = 3389
     to_port     = 3389
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] #Respective public IP's to be used
+    cidr_blocks = ["0.0.0.0/0"] #Respective public IP's of the management to be used
   }
 
   egress {
@@ -149,7 +163,7 @@ resource "aws_security_group" "bastion-sg" {
   }
 }
   
-#Bastion Creation
+#Creation of Bastion Host
 resource "aws_instance" "Bastion" {
   ami           = "ami-0fcd8d621cf9ab602"
   instance_type = "t2.large"
@@ -204,7 +218,7 @@ resource "aws_security_group" "allow_http" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["${aws_instance.Bastion.private_ip}/32"]
+    cidr_blocks = ["${aws_instance.Bastion.private_ip}/32"] #Access only via Bastion's IP
   }
 
   egress {
@@ -219,11 +233,10 @@ resource "aws_security_group" "allow_http" {
   }
 
 }
-  
 
 
 
-#ELB
+#Creation of interet-facing ELB
 resource "aws_elb" "web_elb" {
   name = "web-elb"
   security_groups = [aws_security_group.elb_http.id]
@@ -232,7 +245,6 @@ resource "aws_elb" "web_elb" {
     aws_subnet.public2_ap_south_1b.id
   ]
   
-  #instances                   = [aws_instance.busybox_web_server.id]
   cross_zone_load_balancing   = true
 
   health_check {
@@ -252,15 +264,18 @@ resource "aws_elb" "web_elb" {
 
 }
 
+
+#KEY Pair used for bastion and web servers
+#Use Get Password for Windows bastion Host
+#Public and private keys of the file are added in the code -- can be changed using ssh-keygen
+
 resource "aws_key_pair" "instance-key" {
   key_name   = "instance-key"
   public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDhyh/JES9/yOSrVQBsI4UW6DfnfkxVPwfWns4UdZg7rAWs2TcjAqZByH364pW3w+s98QzaA/jliS6ErZ957fYUrmElz3UIzePyPp/rLh0pkRv7FSIrovTJQHXVdmjLh0WckFykf4OSPgAJXIubDCoc2ktJXuSmzKNhm3XVBcyvVV/G6bsWY+wW1z1LLoCkE8w8iV0QJrwnMul9p6PzQneIS6Rkvz++9lYNcdaFWnFBYPqK6G5Z3/U7hxLjs/fgWsdHyasfUqfxUzsbtGzJR9qQ8gAJUoF0nd1a+pAA+rlN5k3TWKTycjaqy0c1RWgkjJunqi83CU6ljLGVtYvKc89LYJaqo5VytAtByUBXyg5li/1b5j4oe9lJEa1ZHmnp/+Ly7rAcI0jGd+J3U8Ahe2X39G6y+i7iIcEz1DhCEQhLHlRn6VKfT9VxnKrGyYtUzmmCd5VhQr+PJgmpfGiP2/t0ZgmhdLowfUQvCxw/LvYw6Ap+k2pxUxf3l2cCO8YWLks= root@mcplmumlptlen18"
 }
 
 
-
-
-#### PART 2 ASG + LC
+# PART 3: --- Creation of Launch Configuration, Auto Scaling Group and Scaling Policies
 
 resource "aws_launch_configuration" "web" {
   name_prefix = "web-"
@@ -365,6 +380,7 @@ resource "aws_autoscaling_group" "web" {
 
 }
 
+#ASG Scaling Policy
 resource "aws_autoscaling_policy" "web_policy_up" {
   name = "web_policy_up"
   scaling_adjustment = 1
@@ -373,6 +389,7 @@ resource "aws_autoscaling_policy" "web_policy_up" {
   autoscaling_group_name = aws_autoscaling_group.web.name
 }
 
+#ASG CloudWatch Alarm for Scaling Policy
 resource "aws_cloudwatch_metric_alarm" "web_cpu_alarm_up" {
   alarm_name = "web_cpu_alarm_up"
   comparison_operator = "GreaterThanOrEqualToThreshold"

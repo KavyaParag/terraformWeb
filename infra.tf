@@ -151,7 +151,7 @@ resource "aws_security_group" "bastion-sg" {
   
 #Bastion Creation
 resource "aws_instance" "Bastion" {
-  ami           = "ami-0fcd8d621cf9ab602	"
+  ami           = "ami-0fcd8d621cf9ab602"
   instance_type = "t2.large"
   subnet_id= aws_subnet.public_ap_south_1a.id
   key_name      = "${aws_key_pair.instance-key.key_name}"
@@ -198,6 +198,7 @@ resource "aws_security_group" "allow_http" {
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"] #Sec group of Load balancer should be referenced to limit direct access to instances
+  }
   
     ingress {
     from_port   = 22
@@ -216,6 +217,7 @@ resource "aws_security_group" "allow_http" {
   tags = {
     Name = "Allow HTTP Security Group"
   }
+
 }
   
 

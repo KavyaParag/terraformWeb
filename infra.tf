@@ -323,7 +323,7 @@ resource "aws_launch_configuration" "web" {
 		apt-get install apache2 -y
 		sudo service apache2 start
 		#Update Homepage
-		echo "Assignment from Mastercard for SRE Engineer by Kavya Parag" > /var/www/html/index.html
+		echo "Terraform web architecture by Kavya Parag" > /var/www/html/index.html
 		#Restart Apache2 Server
 		apt-get restart apache2
 		EOF
